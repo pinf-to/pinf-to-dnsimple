@@ -22,9 +22,18 @@ exports.for = function (API) {
 
 	        var records = resolvedConfig['pinf.logic-for-dns~0'].records;
 
-	        function lookup (name) {
-	        	API.console.verbose("DNS lookup for: " + name);
-	            return API.Q.denodeify(DNS.resolve)(name).then(function (addresses) {
+	        function lookup (name, type) {
+	        	API.console.verbose("DNS resolve '" + type + "' for: " + name);
+
+	        	function resolve () {
+	        		if (type) {
+			            return API.Q.denodeify(DNS.resolve)(name, type);
+	        		} else {
+			            return API.Q.denodeify(DNS.resolve)(name);
+	        		}
+	        	}
+
+	            return resolve().then(function (addresses) {
 
 	            	// TODO: Optionally call each IP to fetch a well-known url containing
 	            	//       public key to ensure that IP is managed by us.
@@ -107,9 +116,15 @@ exports.for = function (API) {
 	            var all = [];
 	            records = Object.keys(records).map(function(name) {
 	                resolvedConfig.declared[name] = records[name];
-	                all.push(lookup(name).then(function(ips) {
-	                    resolvedConfig.resolving[name] = normalizeIPs(ips);
-	                }));                
+	                if (/:/.test(name)) {
+		                all.push(lookup(records[name].data).then(function(ips) {
+		                    resolvedConfig.resolving[name] = normalizeIPs(ips);
+		                }));
+	                } else {
+		                all.push(lookup(name).then(function(ips) {
+		                    resolvedConfig.resolving[name] = normalizeIPs(ips);
+		                }));
+	                }
 	                return {
 	                    domain: records[name].domain,
 	                    type: records[name].type,
@@ -147,53 +162,57 @@ exports.for = function (API) {
 		                });
 					}
 
+					function resolveMX (host) {
+						return lookup(host, "MX").then(function(ips) {
+		                    return normalizeIPs(ips);
+			           	});
+					}
+
 					var done = API.Q.resolve();
 
 	                // Based on gathered info summarize the status.
 	                var diff = 0;
 	                for (var name in resolvedConfig.declared) {
-	                    diff += 1;
 	                    function resolve (name) {
-	                    	function isEqual (ips) {
-	                    		if (typeof ips === "string") {
-	                    			ips = [ ips ];
-	                    		}
-	                    		var found = false;
-	                    		ips.forEach(function (ip) {
-	                    			if (found) return;
-			                    	if (resolvedConfig.resolving[name].indexOf(ip) >= 0) {
-			                    		found = true;
-			                    	}
-	                    		});
-	                    		if (found) {
-			                        diff -= 1;
-	                    		}
-	                    	}
-		                    if (resolvedConfig.declared[name].type === "A") {
-		                    	return isEqual(resolvedConfig.declared[name].data);
-		                    } else
-		                    if (resolvedConfig.declared[name].type === "CNAME") {
-		                    	return resolveCNAME(resolvedConfig.declared[name].data).then(function (ips) {
-			                    	return isEqual(ips);
-		                    	});
-		                    } else
-		                    if (resolvedConfig.declared[name].type === "MX") {
-		                    	if (/^[\.0-9]+$/.test(resolvedConfig.declared[name].data)) {
-			                    	isEqual(resolvedConfig.declared[name].data);
-		                    	} else {
+		                    diff += 1;
+		                    if (resolvedConfig.resolving[name].length === 0) {
+		                    	return;
+		                    }
+	                    	done = API.Q.when(done, function () {
+
+		                    	function isEqual (ips) {
+		                    		if (typeof ips === "string") {
+		                    			ips = [ ips ];
+		                    		}
+		                    		var found = false;
+		                    		ips.forEach(function (ip) {
+		                    			if (found) return;
+				                    	if (resolvedConfig.resolving[name].indexOf(ip) >= 0) {
+				                    		found = true;
+				                    	}
+		                    		});
+		                    		if (found) {
+				                        diff -= 1;
+		                    		}
+		                    	}
+			                    if (resolvedConfig.declared[name].type === "A") {
+			                    	return isEqual(resolvedConfig.declared[name].data);
+			                    } else
+			                    if (resolvedConfig.declared[name].type === "CNAME") {
 			                    	return resolveCNAME(resolvedConfig.declared[name].data).then(function (ips) {
 				                    	return isEqual(ips);
 			                    	});
-		                    	}
-		                    } else {
-		                    	throw new Error("Type '" + resolvedConfig.declared[name].type + "' not yet implemented!");
-		                    }
-   	                    }
-	                    if (resolvedConfig.resolving[name].length > 0) {
-	                    	done = API.Q.when(done, function () {
-	                    		return resolve(name);
+			                    } else
+			                    if (resolvedConfig.declared[name].type === "MX") {
+			                    	return resolveMX(resolvedConfig.declared[name].domain).then(function (ips) {
+				                    	return isEqual(ips);
+			                    	});
+			                    } else {
+			                    	throw new Error("Type '" + resolvedConfig.declared[name].type + "' not yet implemented!");
+			                    }
 	                    	});
-	                    }
+   	                    }
+		        		resolve(name);
 	                }
 	                return done.then(function () {
 		                if (diff === 0) {
@@ -205,6 +224,7 @@ exports.for = function (API) {
 	            });
 
 			}).then(function () {
+
 				return resolvedConfig;
 			});
 		});
@@ -260,6 +280,9 @@ exports.for = function (API) {
 							record.name = record.name.replace(new RegExp("\\." + domain.name + "$"), "");
 							if (record.type === "A" && record.domain == record.name) {
 								record.name = "";
+							} else
+							if (record.type === "MX") {
+								record.name = "";
 							}
 						}
 					});
@@ -299,23 +322,23 @@ exports.for = function (API) {
 							}).length === 0);
 						}).forEach(function(createRecord) {
 							done = API.Q.when(done, function() {
+								var data = {
+									name: createRecord.name,
+									record_type: createRecord.type,
+									content: createRecord.data
+								};
+								if (createRecord.type === "MX") {
+									data.prio = createRecord.prio;
+								}
 								if (createRecord._needsUpdate) {
 									API.console.verbose(("Updating DNS record: " + JSON.stringify(createRecord)).magenta);
 									return call("PUT", "/domains/" + domainId + "/records/" + createRecord._needsUpdate, {
-										record: {
-											name: createRecord.name,
-											record_type: createRecord.type,
-											content: createRecord.data
-										}
+										record: data
 									});
 								}
 								API.console.verbose(("Creating DNS record: " + JSON.stringify(createRecord)).magenta);
 								return call("POST", "/domains/" + domainId + "/records", {
-									record: {
-										name: createRecord.name,
-										record_type: createRecord.type,
-										content: createRecord.data
-									}
+									record: data
 								});
 							});
 						});
