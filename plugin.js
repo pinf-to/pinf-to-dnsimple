@@ -1,6 +1,8 @@
 
 const DNS = require("dns");
 
+// @see https://dnsimple.com/domains
+// @see https://github.com/fvdm/nodejs-dnsimple
 
 exports.for = function (API) {
 
@@ -19,6 +21,9 @@ exports.for = function (API) {
 			) {
 				return resolvedConfig;
 			}
+
+			API.ASSERT.equal(typeof resolvedConfig.credentials.email, "string");
+			API.ASSERT.equal(typeof resolvedConfig.credentials.token, "string");
 
 	        var records = resolvedConfig['pinf.logic-for-dns~0'].records;
 
@@ -239,12 +244,6 @@ exports.for = function (API) {
 		) {
 			return;
 		}
-
-		// @see https://dnsimple.com/domains
-		// @see https://github.com/fvdm/nodejs-dnsimple
-
-		API.ASSERT.equal(typeof resolvedConfig.credentials.email, "string");
-		API.ASSERT.equal(typeof resolvedConfig.credentials.token, "string");
 
 		function call (method, path, payload) {
 			var deferred = API.Q.defer();
