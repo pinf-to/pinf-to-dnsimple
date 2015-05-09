@@ -28,7 +28,7 @@ exports.for = function (API) {
 	        var records = resolvedConfig['pinf.logic-for-dns~0'].records;
 
 	        function lookup (name, type) {
-	        	API.console.verbose("DNS resolve '" + type + "' for: " + name);
+	        	API.console.verbose("DNS resolve" + (type ? (" '" + type + "'"):"") + " for: " + name);
 
 	        	function resolve () {
 	        		if (type) {
