@@ -27,6 +27,40 @@ exports.for = function (API) {
 
 	        var records = resolvedConfig['pinf.logic-for-dns~0'].records;
 
+/*
+TODO: Use this more compact version vs the more verbose one below.
+    function lookup (name, type) {
+    	function resolve (name, type) {
+	    	API.console.verbose("DNS resolve" + (type ? (" '" + type + "'"):"") + " for: " + name);
+    		if (type) {
+	            return API.Q.denodeify(DNS.resolve)(name, type);
+    		} else {
+	            return API.Q.denodeify(DNS.resolve)(name);
+    		}
+    	}
+    	if (!lookup._unresolvingIP) {
+    		return resolve("a.domain.that.will.never.resolve." + Date.now() + ".so.we.can.determine.default.ip.com").then(function(addresses) {
+	        	lookup._unresolvingIP = addresses[0] || null;
+	        }).then(function () {
+	        	return lookup(name, type);
+	        });
+    	}
+        return resolve(name, type).then(function (addresses) {
+			if (typeof addresses === "string") {
+				addresses = [ addresses ];
+			}
+	        return addresses.filter(function(ip) {
+	            if (ip == lookup._unresolvingIP) return false;
+	            return true;
+	        });
+        }).fail(function(err) {
+        	if (!/^a\.domain\.that\.will\.never\.resolve\./.test(name)) {
+        		API.console.debug("Warning: Error looking up hostname '" + name + "':", err.stack);
+            }
+            return [];
+        });
+    }
+*/
 	        function lookup (name, type) {
 	        	API.console.verbose("DNS resolve" + (type ? (" '" + type + "'"):"") + " for: " + name);
 
