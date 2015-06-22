@@ -22,6 +22,17 @@ exports.for = function (API) {
 				return resolvedConfig;
 			}
 
+			if (
+				!resolvedConfig.credentials ||
+				!resolvedConfig.credentials.email ||
+				!resolvedConfig.credentials.token
+			) {
+				resolvedConfig.status = "ignore";
+				// TODO: Advice that config is not complete.
+				return resolvedConfig;
+			}
+
+			// TODO: Strict validation.
 			API.ASSERT.equal(typeof resolvedConfig.credentials.email, "string");
 			API.ASSERT.equal(typeof resolvedConfig.credentials.token, "string");
 
@@ -272,6 +283,7 @@ TODO: Use this more compact version vs the more verbose one below.
 	exports.turn = function (resolvedConfig) {
 
 		if (
+			resolvedConfig.status === "ignore" ||
 			resolvedConfig.status === "resolving" ||
 			!resolvedConfig.declared ||
 			Object.keys(resolvedConfig.declared).length === 0
