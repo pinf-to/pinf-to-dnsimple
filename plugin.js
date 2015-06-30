@@ -16,9 +16,11 @@ exports.for = function (API) {
 			//       calls when everything is assumed to not have changed.
 
 			if (
-				!resolvedConfig['pinf.logic-for-dns~0'] ||
-				!resolvedConfig['pinf.logic-for-dns~0'].records
+				!resolvedConfig['$pinf.logic-for-dns~0'] ||
+				!resolvedConfig['$pinf.logic-for-dns~0'].records
 			) {
+	        	API.console.verbose("Skip resolve DNS. No records declared.", resolvedConfig);
+
 				return resolvedConfig;
 			}
 
@@ -29,6 +31,9 @@ exports.for = function (API) {
 			) {
 				resolvedConfig.status = "ignore";
 				// TODO: Advice that config is not complete.
+
+	        	API.console.verbose("Skip resolve DNS. No credentials declared.", resolvedConfig);
+
 				return resolvedConfig;
 			}
 
@@ -36,7 +41,9 @@ exports.for = function (API) {
 			API.ASSERT.equal(typeof resolvedConfig.credentials.email, "string");
 			API.ASSERT.equal(typeof resolvedConfig.credentials.token, "string");
 
-	        var records = resolvedConfig['pinf.logic-for-dns~0'].records;
+	        var records = resolvedConfig['$pinf.logic-for-dns~0'].records;
+
+        	API.console.verbose("DNS resolve for records", records);
 
 /*
 TODO: Use this more compact version vs the more verbose one below.
